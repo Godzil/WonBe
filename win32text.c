@@ -9,7 +9,8 @@
 #define SCREEN_SIZE_Y (144/8)
 static WORD screen[SCREEN_SIZE_X][SCREEN_SIZE_Y];
 
-static WORD lastChar;
+//static WORD lastChar;
+static UINT lastVKey;
 
 static HWND hwnd;
 
@@ -22,6 +23,7 @@ static void wmPaint( HWND hWnd, HDC hdc )
 
 	GetClientRect( hWnd, &rect );
 
+	SelectObject( hdc, GetStockObject( SYSTEM_FIXED_FONT ) );
 	GetTextMetrics( hdc, &tm );
 
 	xArea = SCREEN_SIZE_X * tm.tmMaxCharWidth;
@@ -48,11 +50,19 @@ static void wmPaint( HWND hWnd, HDC hdc )
 					rectDraw.top+y*tm.tmHeight,
 					str, 2 );
 			} else {
-				str[0] = (BYTE)val;
-				TextOut( hdc,
-					rectDraw.left+x*tm.tmMaxCharWidth,
-					rectDraw.top+y*tm.tmHeight,
-					str, 1 );
+				static char table[] = "@Ih”“•fij–{C|D^‚O‚P‚Q‚R‚S‚T‚U‚V‚W‚XFGƒ„H—‚`‚a‚b‚c‚d‚e‚f‚g‚h‚i‚j‚k‚l‚m‚n‚o‚p‚q‚r‚s‚t‚u‚v‚w‚x‚ymnOQM‚‚‚‚ƒ‚„‚…‚†‚‡‚ˆ‚‰‚Š‚‹‚Œ‚‚Ž‚‚‚‘‚’‚“‚”‚•‚–‚—‚˜‚™‚šobpP";
+				if( val >= 0x20 && val <= 0x7e ) {
+					TextOut( hdc,
+						rectDraw.left+x*tm.tmMaxCharWidth,
+						rectDraw.top+y*tm.tmHeight,
+						&table[(val-0x20)*2], 2 );
+				} else {
+					str[0] = (BYTE)val;
+					TextOut( hdc,
+						rectDraw.left+x*tm.tmMaxCharWidth,
+						rectDraw.top+y*tm.tmHeight,
+						str, 1 );
+				}
 			}
 		}
 	}
@@ -70,9 +80,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 
-	case WM_CHAR:
-		lastChar = (WORD)wParam;
+	case WM_KEYDOWN:
+		lastVKey = (WORD)wParam;
 		break;
+
+	//case WM_CHAR:
+	//	lastChar = (WORD)wParam;
+	//	break;
 
 	case WM_CLOSE:
 		return 0;	// •Â‚¶‚¿‚á‘Ê–Ú
@@ -166,7 +180,8 @@ int createText()
     DWORD dwThreadId, dwThrdParam = 1; 
     HANDLE hThread; 
 
-	lastChar = 0;
+	//lastChar = 0;
+	lastVKey = 0;
     hThread = CreateThread( 
         NULL,                        // no security attributes 
         0,                           // use default stack size  
@@ -179,42 +194,37 @@ int createText()
 
 unsigned short win32_wait()
 {
-	WORD t;
+	UINT t;
 	while( TRUE ) {
 		// ˆÈ‰º‚Ì2s‚Í–{“–‚Íƒ}ƒ‹ƒ`ƒXƒŒƒbƒh“I‚ÉNG‚È‚ñ‚¾‚¯‚Ç
 		// ƒeƒXƒg—pŠÂ‹«‚¾‚©‚ç‘å–Ú‚ÉŒ©‚é
-		t = lastChar;
-		lastChar = 0;
+		t = lastVKey;
+		lastVKey = 0;
 		switch( t ) {
-		case 'p':
 		case 'P':
 			return 0x02;	// START BUTTON
-		case ' ':
+		case VK_SPACE:
 			return 0x04;	//KEYWORD_SCAN_A;
-		case 0x1b:
+		case VK_ESCAPE:
 			return 0x08;	//KEYWORD_SCAN_B;
-		case 'e':
+		case VK_UP:
 		case 'E':
 			return 0x10;	//KEYWORD_SCAN_X1;
-		case 'd':
+		case VK_RIGHT:
 		case 'D':
 			return 0x20;	//KEYWORD_SCAN_X2;
-		case 'x':
+		case VK_DOWN:
 		case 'X':
 			return 0x40;	//KEYWORD_SCAN_X3;
-		case 's':
+		case VK_LEFT:
 		case 'S':
 			return 0x80;	//KEYWORD_SCAN_X4;
-		case 't':
 		case 'T':
 			return 0x100;	//KEYWORD_SCAN_Y1;
-		case 'g':
 		case 'G':
 			return 0x200;	//KEYWORD_SCAN_Y2;
-		case 'v':
 		case 'V':
 			return 0x400;	//KEYWORD_SCAN_Y3;
-		case 'f':
 		case 'F':
 			return 0x800;	//KEYWORD_SCAN_Y4;
 		}

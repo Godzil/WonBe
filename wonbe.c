@@ -7,18 +7,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#ifdef WIN32
+#include <assert.h>
+#endif
 #ifdef WW
 #include <sys/comm.h>
 #include <sys/process.h>
 #include <sys/fcntl.h>
 #include <sys/bios.h>
+#define assert(x)
 #endif
 #include "keywords.h"
 #ifdef WIN32
 #include "win32text.h"
 #endif
 
-char myVersion[] = "0.03";
+char myVersion[] = "0.04";
 
 #ifdef WW
 #define MEMMOVE mymemmove
@@ -106,7 +110,7 @@ void consoleInput( BYTE * buf, WORD len )
 			if( ch == 0x08 ) {	/* BS */
 				if( cursor > 0 ) {
 					cursor--;
-					comm_send_char( ch );
+					comm_send_char( (unsigned char)ch );
 					continue;
 				}
 			}
@@ -119,7 +123,7 @@ inputAsChar:
 				if( cursor < len-1 ) {
 					buf[cursor] = ch;
 					cursor++;
-					comm_send_char( ch );
+					comm_send_char( (unsigned char)ch );
 				}
 			}
 		}
@@ -134,39 +138,91 @@ typedef struct {
 	const BYTE * name;
 } KEYWORDITEM;
 
-KEYWORDITEM keywords[] = {
-	{ KEYWORD_IF,"if" },
-	{ KEYWORD_PRINT,"print" },
-	{ KEYWORD_LOCATE,"locate" },
+KEYWORDITEM keywordsA[] = {
+	{ KEYWORD_AND,"and" },
+	{ KEYWORD_ABS,"abs" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsB[] = {
+	{ KEYWORD_BREAK,"break" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsC[] = {
+	{ KEYWORD_CHR,"chr" },
 	{ KEYWORD_CLS,"cls" },
+	{ KEYWORD_CONT,"cont" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsD[] = {
+	{ KEYWORD_DEBUG,"debug" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsE[] = {
+	{ KEYWORD_END,"end" },
+	{ KEYWORD_EXIT,"exit" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsF[] = {
+	{ KEYWORD_FOR,"for" },
+	{ KEYWORD_FILES,"files" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsG[] = {
 	{ KEYWORD_GOTO,"goto" },
 	{ KEYWORD_GOSUB,"gosub" },
-	{ KEYWORD_RETURN,"return" },
-	{ KEYWORD_FOR,"for" },
-	{ KEYWORD_NEXT,"next" },
-	{ KEYWORD_END,"end" },
-	{ KEYWORD_BREAK,"break" },
-	{ KEYWORD_REM,"rem" },
-	{ KEYWORD_NEW,"new" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsI[] = {
+	{ KEYWORD_IF,"if" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsL[] = {
+	{ KEYWORD_LOCATE,"locate" },
 	{ KEYWORD_LIST,"list" },
-	{ KEYWORD_RUN,"run" },
-	{ KEYWORD_CONT,"cont" },
-	{ KEYWORD_SAVE,"save" },
 	{ KEYWORD_LOAD,"load" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsM[] = {
 	{ KEYWORD_MERGE,"merge" },
-	{ KEYWORD_RANDOMIZE,"randomize" },
-	{ KEYWORD_EXIT,"exit" },
-	{ KEYWORD_DEBUG,"debug" },
-	{ KEYWORD_WAITVB,"waitvb" },
-	{ KEYWORD_FILES,"files" },
-	{ KEYWORD_AND,"and" },
-	{ KEYWORD_OR,"or" },
-	{ KEYWORD_XOR,"xor" },
+	{ 0,NULL }
+};
+KEYWORDITEM keywordsN[] = {
+	{ KEYWORD_NEXT,"next" },
 	{ KEYWORD_NOT,"not" },
-	{ KEYWORD_WAIT,"wait" },
+	{ KEYWORD_NEW,"new" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsO[] = {
+	{ KEYWORD_OR,"or" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsP[] = {
+	{ KEYWORD_PRINT,"print" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsR[] = {
+	{ KEYWORD_REM,"rem" },
+	{ KEYWORD_RETURN,"return" },
 	{ KEYWORD_RND,"rnd" },
-	{ KEYWORD_ABS,"abs" },
-	{ KEYWORD_TICK,"tick" },
+	{ KEYWORD_RUN,"run" },
+	{ KEYWORD_RANDOMIZE,"randomize" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsS[] = {
+	{ KEYWORD_STEP,"step" },
 	{ KEYWORD_SCAN_A,"scan_a" },
 	{ KEYWORD_SCAN_B,"scan_b" },
 	{ KEYWORD_SCAN_X1,"scan_x1" },
@@ -178,11 +234,35 @@ KEYWORDITEM keywords[] = {
 	{ KEYWORD_SCAN_Y3,"scan_y3" },
 	{ KEYWORD_SCAN_Y4,"scan_y4" },
 	{ KEYWORD_SCAN,"scan" },	/* scanはscna_Xより後になければならない */
-	{ KEYWORD_THEN,"then" },
-	{ KEYWORD_CHR,"chr" },
-	{ KEYWORD_TO,"to" },
-	{ KEYWORD_STEP,"step" },
+	{ KEYWORD_SAVE,"save" },
 	{ 0,NULL }
+};
+KEYWORDITEM keywordsT[] = {
+	{ KEYWORD_THEN,"then" },
+	{ KEYWORD_TO,"to" },
+	{ KEYWORD_TICK,"tick" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsW[] = {
+	{ KEYWORD_WAITVB,"waitvb" },
+	{ KEYWORD_WAIT,"wait" },	// waitはwaitvbより後になければならない
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsX[] = {
+	{ KEYWORD_XOR,"xor" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM * keywordsIndex[26] = {
+	keywordsA, keywordsB, keywordsC, keywordsD, 
+	keywordsE, keywordsF, keywordsG, NULL, 
+	keywordsI, NULL,      NULL,      keywordsL, 
+	keywordsM, keywordsN, keywordsO, keywordsP, 
+	NULL,      keywordsR, keywordsS, keywordsT, 
+	NULL,      NULL,      keywordsW, keywordsX, 
+	NULL,      NULL
 };
 
 /* インタラクティブモード時の1行バッファ */
@@ -254,6 +334,9 @@ int requestNextAction;	/* 以下のいずれか */
 #define REQUEST_MERGE_FILE 7
 /* REQUEST_RUN_LINENUMBERで実行開始をリクエストする行番号 */
 WORD runLineNumber;
+// 編集機能が追加専用モードであることを示す
+// REQUEST_RUN_FILE or REQUEST_LOAD_FILE経由で処理するときだけTRUEとなる
+BOOL appendMode = FALSE;
 
 /* エラー発生 */
 void syntaxError()
@@ -377,6 +460,14 @@ BYTE * skipToEOL( BYTE * p )
 	}
 }
 
+BYTE * skipToNextLine( BYTE * p )
+{
+	return skipToEOL( p+4 );	// +4は行番号2バイト行長さ2バイト
+}
+
+#if 1
+#define mytolower(ch) ((ch >= 'A' && ch <= 'Z')? ch - 'A' + 'a' : ch)
+#else
 BYTE mytolower( BYTE ch )
 {
 	if( ch >= 'A' && ch <= 'Z' ) {
@@ -384,6 +475,7 @@ BYTE mytolower( BYTE ch )
 	}
 	return ch;
 }
+#endif
 
 /* シフトJISの1バイト目かどうか判断。マクロなので副作用に注意 */
 #define IsDBCSLeadByte(ch) ((ch >= 0x81 && ch <= 0x9f) || (ch >= 0xe0 && ch <= 0xfc))
@@ -407,7 +499,7 @@ void processLineHeader()
 {
 	if( !bInteractive ) {
 		currentLineNumber = *((WORD *)executionPointer);
-		executionPointer += 2;
+		executionPointer += 4;	// +4は行番号2バイト行長さ2バイト
 	} else {
 		currentLineNumber = 0;
 	}
@@ -427,9 +519,7 @@ BYTE * getLineReferenceFromLineNumber( WORD lineNumber )
 		if( lineNumber == t ) {
 			return p;
 		}
-		p += 2;
-		p = skipToEOL( p );
-		p++;
+		p += *((WORD *)(p+2));
 	}
 }
 
@@ -446,9 +536,7 @@ BYTE * getInsertionPointFromLineNumber( WORD lineNumber )
 		if( lineNumber <= t ) {
 			return p;
 		}
-		p += 2;
-		p = skipToEOL( p );
-		p++;
+		p += *((WORD *)(p+2));
 	}
 }
 
@@ -519,7 +607,7 @@ void ptextTab()
 	xCursor = (xCursor+TABSTOP) / TABSTOP * TABSTOP;
 }
 
-void ptextString( const BYTE * msg )
+void ptextString( const BYTE FAR * msg )
 {
 	while( TRUE ) {
 		WORD ch;
@@ -591,7 +679,7 @@ BOOL sourceDump( FILE FAR * fp, WORD from, WORD to )
 		lineNumber = *((WORD*)p);
 		if( lineNumber == 0 ) break;
 		if( lineNumber > to ) break;
-		p += 2;
+		p += 4;
 		b = commonPrint(fp,"%d",lineNumber);
 		if( b == FALSE ) return FALSE;
 		while( TRUE ) {
@@ -626,29 +714,38 @@ BOOL sourceDump( FILE FAR * fp, WORD from, WORD to )
 					p++;
 				}
 			} else if( *p >= 0x80 ) {
-				KEYWORDITEM * k = keywords;
-				while( TRUE ) {
-					if( k->id == 0 ) {
-						b = commonPrint(fp,"[?%x?]", *p );
-						if( b == FALSE ) return FALSE;
-						p++;
-						break;
-					}
-					if( k->id == *p ) {
-						b = commonPrint(fp, k->name );
-						if( b == FALSE ) return FALSE;
-						p++;
-						if( k->id == KEYWORD_REM ) {	/* コメントのあとはそのまま行末まで転送 */
-							while( TRUE ) {
-								if( *p == EOL ) break;
-								b = commonPrint(fp,"%c",*p);
-								if( b == FALSE ) return FALSE;
-								p++;
+				int i;
+				BOOL found;
+				found = FALSE;
+				for( i=0; i<26; i++ ) {
+					KEYWORDITEM * k;
+					if( found ) break;
+					k = keywordsIndex[i];
+					if( k == NULL ) continue;
+					while( TRUE ) {
+						if( k->id == 0 ) break;
+						if( k->id == *p ) {
+							b = commonPrint(fp, k->name );
+							if( b == FALSE ) return FALSE;
+							p++;
+							if( k->id == KEYWORD_REM ) {	/* コメントのあとはそのまま行末まで転送 */
+								while( TRUE ) {
+									if( *p == EOL ) break;
+									b = commonPrint(fp,"%c",*p);
+									if( b == FALSE ) return FALSE;
+									p++;
+								}
 							}
+							found = TRUE;
+							break;
 						}
-						break;
+						k++;
 					}
-					k++;
+				}
+				if( !found ) {
+					b = commonPrint(fp,"[?%x?]", *p );
+					if( b == FALSE ) return FALSE;
+					p++;
 				}
 			} else {
 				b = commonPrint(fp,"%c",*p);
@@ -1516,13 +1613,21 @@ void editLine()
 {
 	WORD wishLineNumber;
 	BYTE ch, * p, * target;
-	/* トリックに注意! */
-	/* 行頭の整数を、行番号に変換するには結果的に先頭の0x01を取り去るだけで良い */
-	MEMMOVE( waCoockedLine, waCoockedLine+1, LINE_SIZE-1 );
-	/* トリック終わり。この時点でwsCoockedLineは、プログラム内部表現の形式に一致している */
-	wishLineNumber = *((WORD*)waCoockedLine);
-	p = waCoockedLine+2;
-	target = getLineReferenceFromLineNumber( wishLineNumber );
+	WORD lineNumber;
+
+	// プログラム領域に行を格納する場合は
+	// 先頭に2バイトの行番号と2バイトの行長さの情報が格納される
+	// 一方、中間言語翻訳の結果は先頭に0x01で始まる10進整数が行番号として入っている
+	// このギャップを転送時に解消しなければならない
+
+	// ここに来ているということは、waCoockedLine[0]が0x01つまり10進整数である //
+	assert( waCoockedLine[0] == 0x01 );
+	wishLineNumber = *((WORD*)&waCoockedLine[1]);
+	p = waCoockedLine+3;
+	//target = getLineReferenceFromLineNumber( wishLineNumber );
+	target = getInsertionPointFromLineNumber( wishLineNumber );
+	lineNumber = *((WORD*)target);
+
 	while( TRUE ) {
 		ch = *p++;
 		if( ch != ' ' && ch != '\t' ) break;
@@ -1531,37 +1636,31 @@ void editLine()
 		WORD delta;
 		BYTE * from;
 		/* removing the line */
-		if( target == NULL ) {
+		if( lineNumber == 0 || lineNumber != wishLineNumber ) {
 			lineNumberNotFound( wishLineNumber );
 			return;
 		}
-		from = skipToEOL(target)+1;
+		from = skipToNextLine(target);
 		delta = from-target;
 		MEMMOVE( target, from, (WORD)(dataTop-(from-wa)) );
 		dataTop -= delta;
-		/*clearRuntimeInfo();*/
 	} else {
-		WORD len;
-		len = skipToEOL(waCoockedLine+2)-waCoockedLine+1;
-		if( target == NULL ) {
+		WORD len;	// プログラム領域上に収めるときのサイズ
+		len = skipToEOL(p)-waCoockedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
+		if( lineNumber == 0 || lineNumber != wishLineNumber ) {
 			/* insert new line */
-			/*const BYTE * to;*/
 			if( dataTop + len >= WORKAREA_SIZE ) {
 				outOfMemory();
 				return;
 			}
-			target = getInsertionPointFromLineNumber( wishLineNumber );
-			/* to = skipToEOL(target)+1; */
 			MEMMOVE( target+len, target, (WORD)(dataTop-(target-wa)) );
-			MEMMOVE( target, waCoockedLine, len );
 			dataTop += len;
-			/*clearRuntimeInfo();*/
 		} else {
 			/* replace line */
 			WORD lost;
 			BYTE * nextline;
 			int delta;
-			nextline = skipToEOL(target)+1;
+			nextline = skipToNextLine(target)+1;
 			lost = nextline-target;
 			delta = len-lost;
 			if( dataTop + delta >= WORKAREA_SIZE ) {
@@ -1569,11 +1668,40 @@ void editLine()
 				return;
 			}
 			MEMMOVE( nextline+delta, nextline, (WORD)(dataTop-(nextline-wa)) );
-			MEMMOVE( target, waCoockedLine, len );
 			dataTop += delta;
-			/*clearRuntimeInfo();*/
 		}
+		// まず行番号をコピーする
+		*((WORD*)target) = *((WORD*)&waCoockedLine[1]);
+		// 行の長さを収める
+		*((WORD*)(target+2)) = len;
+		// 残りをコピーする
+		MEMMOVE( target+4, waCoockedLine+3, (WORD)(len-4) );
 	}
+}
+
+/* 追加専門の行エディタ */
+void appendLine()
+{
+	BYTE * target;
+	WORD len;	// プログラム領域上に収めるときのサイズ
+	len = skipToEOL(waCoockedLine+3)-waCoockedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
+	if( dataTop + len >= WORKAREA_SIZE ) {
+		outOfMemory();
+		return;
+	}
+	target = &wa[dataTop-5];	// -5 is len of last-line-marker
+	// まず行番号をコピーする
+	*((WORD*)target) = *((WORD*)&waCoockedLine[1]);
+	// 行の長さを収める
+	*((WORD*)(target+2)) = len;
+	// 残りをコピーする
+	MEMMOVE( target+4, waCoockedLine+3, (WORD)(len-4) );
+	dataTop += len;
+	wa[dataTop-5] = 0;
+	wa[dataTop-4] = 0;
+	wa[dataTop-3] = 0;
+	wa[dataTop-2] = 0;
+	wa[dataTop-1] = EOL;
 }
 
 /* 中間言語に翻訳する */
@@ -1583,6 +1711,8 @@ BOOL convertInternalCode( BYTE * waCoockedLine, const BYTE * waRawLine )
 	BYTE * dst = waCoockedLine;
 	while( TRUE ) {
 		if( *src == '\0' ) break;
+		if( *src == '\n' ) break;
+		if( *src == '\r' ) break;
 		if( *src == ' ' || *src == '\t' ) {
 			*dst++ = *src++;
 		} else if( *src < 0x20 ) {
@@ -1657,7 +1787,11 @@ BOOL convertInternalCode( BYTE * waCoockedLine, const BYTE * waRawLine )
 			BYTE next = *(src+1);
 			if( (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ) {
 				WORD id;
-				KEYWORDITEM * p = keywords;
+				KEYWORDITEM * p = keywordsIndex[mytolower(*src)-'a'];
+				if( p == NULL ) {
+					syntaxError();
+					return FALSE;
+				}
 				id = 0;
 				while( TRUE ) {
 					const BYTE * ps, * pd;
@@ -1814,18 +1948,8 @@ void interactiveMain( FILE FAR * fp )
 			consoleInput( waRawLine, LINE_SIZE );
 		} else {
 			char FAR * r;
-			char * p;
 			r = fgets( waRawLine, LINE_SIZE, fp );
 			if( r == NULL ) break;
-			p = waRawLine;
-			while( TRUE ) {
-				if( *p == '\0' ) break;
-				if( *p == '\n' || *p == '\r') {
-					*p = '\0';
-					break;
-				}
-				p++;
-			}
 		}
 #ifdef WW
 		if( fp == NULL ) {
@@ -1841,7 +1965,11 @@ void interactiveMain( FILE FAR * fp )
 		/* 数値で開始されているか? */
 		if( waCoockedLine[0] == 0x01 ) {
 			/* 行エディタを呼び出す */
-			editLine();
+			if( appendMode ) {
+				appendLine();
+			} else {
+				editLine();
+			}
 			if( fp == NULL ) {
 				clearRuntimeInfo();
 			}
@@ -1879,8 +2007,10 @@ void do_new()
 	codeTop = 0;
 	wa[0] = 0;
 	wa[1] = 0;
-	wa[2] = EOL;
-	dataTop = 3;
+	wa[2] = 0;
+	wa[3] = 0;
+	wa[4] = EOL;
+	dataTop = 5;
 }
 
 BOOL do_merge( const BYTE * filename )
@@ -1912,14 +2042,18 @@ void superMain()
 			break;
 		case REQUEST_RUN_FILE:
 			do_new();
+			appendMode=TRUE;
 			b = do_merge( waRawLine );
+			appendMode=FALSE;
 			if( b ) {
 				do_run( 0 );
 			}
 			break;
 		case REQUEST_LOAD_FILE:
 			do_new();
+			appendMode=TRUE;
 			do_merge( waRawLine );
+			appendMode=FALSE;
 			break;
 		case REQUEST_MERGE_FILE:
 			do_merge( waRawLine );
@@ -1945,12 +2079,10 @@ void superMain()
 BOOL entranceUI()
 {
 #define MAX_ENT 15
-	/* この関数内のstaticはTurbo-C 2.0のSS!=DS問題を回避するために必要なもの */
-	static int i;
-	struct stat statbuf;
-	static char names[MAX_ENT][MAXFNAME];
-	static int nent;
-	static int c, select;
+	int i;
+	struct stat statbuf[MAX_ENT];
+	int nent;
+	int c, select;
 
 	ptextCLS();
 	ptextString( "ワンべぇ V" );
@@ -1964,37 +2096,20 @@ BOOL entranceUI()
 	for (i = 0; i < nent; i++) {
 		int result;
 		if( c >= MAX_ENT ) break;
-		result = getent(NULL, i, &statbuf);
+		result = getent(NULL, i, &statbuf[c]);
 		if (result == E_FS_SUCCESS) {
-			if (statbuf.count != -1) {
-				/* Freya OSのバグ?　回避コード */
-				{
-					static int p;
-					int q;
-					p = 0;
-					q = 0;
-					waRawLine[p++] = statbuf.info[q++];
-					waRawLine[p++] = statbuf.info[q++];
-					while( TRUE ) {
-						if( statbuf.info[q] == '\0' ) break;
-						waRawLine[p++] = statbuf.info[q++];
+			if (statbuf[c].count != -1) {
+				char FAR * p;
+				int l;
+				p = statbuf[c].name;
+				l = strlen(p);
+				if( l >= 3 ) {
+					if( p[l-3] == '.' && p[l-2] == 'w' && p[l-1] == 'b' ) {
+						ptextLocate(1,c+2);
+						ptextString( statbuf[c].info );
+						c++;
 					}
-					waRawLine[p++] = '\0';
-					ptextLocate(1,c+2);
-					ptextString( waRawLine );
 				}
-				{
-					static int r;
-					int q;
-					q = 0;
-					r = 0;
-					while( TRUE ) {
-						if( statbuf.name[q] == '\0' ) break;
-						names[c][r++] = statbuf.name[q++];
-					}
-					names[c][r] = '\0';
-				}
-				c++;
 			}
 		}
 	}
@@ -2006,34 +2121,39 @@ BOOL entranceUI()
 			ptextLocate(0,i+2);
 			ptextString( " " );
 		}
-		ptextLocate(0,select+2);
-		ptextString( "→" );
+		if( c > 0 ) {
+			ptextLocate(0,select+2);
+			ptextString( "→" );
+		}
 		key = key_wait();
-		/* START */
+		/* START button */
 		if( key & 0x02 ) return FALSE;	/* 中止 */
-		/* A */
-		if( key & 0x04 ) {
-			strcpy( waRawLine, names[select] );
-			requestNextAction = REQUEST_RUN_FILE;
-			runtimeOnly = TRUE;
-			return TRUE;
-		}
-		/* B */
+		/* B button */
 		if( key & 0x08 ) return FALSE;	/* 中止 */
-		/* X1 or Y1 */
-		if( (key & 0x10) != 0 || (key & 0x100) != 0 ) {
-			select = select-1;
-			if( select < 0 ) {
-				select = c-1;
+		if( c > 0 ) {
+			/* A button */
+			if( key & 0x04 ) {
+				strcpy( waRawLine, statbuf[select].name );
+				requestNextAction = REQUEST_RUN_FILE;
+				runtimeOnly = TRUE;
+				return TRUE;
+			}
+			/* X1 or Y1 */
+			if( (key & 0x10) != 0 || (key & 0x100) != 0 ) {
+				select = select-1;
+				if( select < 0 ) {
+					select = c-1;
+				}
+			}
+			/* X3 or Y3 */
+			if( (key & 0x40) != 0 || (key & 0x400) != 0 ) {
+				select = select+1;
+				if( select >= c ) {
+					select = 0;
+				}
 			}
 		}
-		/* X3 or Y3 */
-		if( (key & 0x40) != 0 || (key & 0x400) != 0 ) {
-			select = select+1;
-			if( select >= c ) {
-				select = 0;
-			}
-		}
+		/* Y2 button */
 		if( (key & 0x200) != 0 ) {
 			return TRUE;
 		}
