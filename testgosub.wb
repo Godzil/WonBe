@@ -1,0 +1,19 @@
+100 'gosubとローカル変数のテスト
+200 a=1
+210 gosub 1000
+220 if a <> 1 then print "220でエラー"
+300 print "main return"
+900 end
+1000 'sub1
+1010 print "sub1"
+1100 a=123
+1200 if a <> 123 then print "1200でエラー"
+1300 gosub 2000
+1400 if a <> 123 then print "1400でエラー"
+1450 print "sub1 return"
+1500 return
+2000 'sub2
+2010 print "sub2"
+2100 a=321
+2200 if a <> 321 then print "2200でエラー"
+2500 return

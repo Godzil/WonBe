@@ -1,0 +1,7 @@
+2 rem cls, locale‚ÌƒeƒXƒg
+5 cls
+7 randomize tick
+10 for i=0 to 999
+20 locate rnd(28),rnd(18)
+30 print chr(rnd(26)+0x41);
+40 next

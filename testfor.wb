@@ -1,0 +1,11 @@
+100 rem ワンべぇ テストプログラム
+200 rem forのテストその1
+210 print "loop by global=":for I=0 to 9:print I,:next:print
+215 print "PUSH ANY BUTTON";wait
+220 print "loop by local=":for i=0 to 9:print i,:next:print
+225 print "PUSH ANY BUTTON";wait
+230 print "loop by array=":for @(0)=0 to 9:print @(0),:next:print
+235 print "PUSH ANY BUTTON";wait
+240 print "step 2=":for i=0 to 18 step 2:print i,:next:print
+245 print "PUSH ANY BUTTON";wait
+250 print "step -1=":for i=9 to 0 step -1:print i,:next:print
