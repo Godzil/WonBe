@@ -1,0 +1,78 @@
+1000 rem シューティング by ワンべぇ
+1005 rem    Nov.7,2000 by autumn
+1010 rem a,b 自機座標
+1020 rem c,d 自ミサイル座標
+1030 rem e,f 敵座標
+1040 rem @(n*2*0),@(n*2+1) 敵ミサイル座標(nは0～7)
+1050 rem g ミサイル生成カウンタ
+1060 rem h ミサイル生成タイミングカウンタ
+2000 rem 座標の初期化
+2010 a=14:b=16
+2020 c=-1:d=-1
+2030 e=15:f=2
+2040 for i=0 to 7:@(i*2)=-1:@(i*2+1)=-1:next
+2050 g=0:h=0
+3000 rem 開始を待つ
+3010 cls
+3020 locate 3,6:print "PUSH BUTTON TO START"
+3030 locate 3,10:print " (NOT START BUTTON)"
+3040 z=wait
+3050 cls:locate 10,8:print "GO!";
+3060 waitvb 30
+4000 rem 表示を更新
+4010 cls
+4020 locate a,b:print "▲";
+4030 locate e,f:print "▼";
+4040 if c>=0 then locate c,d:print "|";
+4050 for i=0 to 7
+4060 if @(i*2)>=0 then locate @(i*2),@(i*2+1):print "*"
+4070 next
+5000 rem 当たり判定
+5010 if (c=e)and(d=f) then goto 8000 '自ミサイルが命中・勝利
+5020 for i=0 to 7
+5030 if (a=@(i*2))and(b=@(i*2+1)) then goto 9000 '敵ミサイルが命中・敗北
+5040 next
+6000 rem 敵移動処理
+6010 r=rnd(2)
+6020 if (r=0)and(e<26) then e=e+1
+6030 if (r<>0)and(e>0) then e=e-1
+6100 rem 敵ミサイル移動処理
+6110 for i=0 to 7
+6120 @(i*2+1)=@(i*2+1)+1
+6130 if @(i*2+1)>16 then @(i*2)=-1:@(i*2+1)=-1
+6140 next
+6200 rem 敵ミサイル生成処理
+6210 h=h+1
+6220 if h>3 then h=0
+6230 if h<>0 then goto 6300
+6240 @(g*2)=e:@(g*2+1)=f+1 '新しいミサイル
+6250 g=g+1:if g>7 then g=0
+6300 rem 自機移動処理
+6310 s=scan
+6320 if s and scan_x2 then if a<26 then a=a+1
+6330 if s and scan_x4 then if a>0 then a=a-1
+6400 rem 自ミサイル移動処理
+6410 if c>=0 then d=d-1:if d<0 then c=-1:d=-1
+6500 rem 自ミサイル発射処理
+6510 if s and scan_a then if c<0 then c=a:d=b-1
+6800 waitvb 3
+6900 goto 4000
+8000 rem 勝利
+8010 X=e:Y=f:gosub 10000
+8020 locate 10,10:print "YOU WIN!"
+8030 goto 9500
+9000 rem 敗北
+9010 X=a:Y=b:gosub 10000
+9020 locate 10,10:print "YOU LOSE..."
+9500 locate 0,12:print "PUSH START BUTTON TO EXIT"
+9510 locate 0,13:print "    ANOTHER IS AGAIN"
+9520 z=wait
+9900 goto 2000
+10000 rem 爆発表現
+10010 for i=0 to 9
+10020 locate X,Y:print "+";
+10030 waitvb 10
+10040 locate X,Y:print "×";
+10050 waitvb 10
+10060 next
+10090 return

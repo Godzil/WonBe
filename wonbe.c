@@ -18,7 +18,7 @@
 #include "win32text.h"
 #endif
 
-char myVersion[] = "0.01";
+char myVersion[] = "0.02";
 
 #ifdef WW
 #define MEMMOVE mymemmove
@@ -163,7 +163,6 @@ KEYWORDITEM keywords[] = {
 	{ KEYWORD_OR,"or" },
 	{ KEYWORD_XOR,"xor" },
 	{ KEYWORD_NOT,"not" },
-	{ KEYWORD_SCAN,"scan" },
 	{ KEYWORD_WAIT,"wait" },
 	{ KEYWORD_RND,"rnd" },
 	{ KEYWORD_ABS,"abs" },
@@ -178,6 +177,7 @@ KEYWORDITEM keywords[] = {
 	{ KEYWORD_SCAN_Y2,"scan_y2" },
 	{ KEYWORD_SCAN_Y3,"scan_y3" },
 	{ KEYWORD_SCAN_Y4,"scan_y4" },
+	{ KEYWORD_SCAN,"scan" },	/* scan‚Íscna_X‚æ‚èŒã‚É‚È‚¯‚ê‚Î‚È‚ç‚È‚¢ */
 	{ KEYWORD_THEN,"then" },
 	{ KEYWORD_CHR,"chr" },
 	{ KEYWORD_TO,"to" },
