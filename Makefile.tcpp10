@@ -1,0 +1,32 @@
+# Makefile for Wonbe 0.04j4
+# with GNUmake and gcc / Turbo C++ 1.0
+# Hirotaka JOE Ohkubo 2000/12/04
+
+INCLUDE = C:/WWitch/include
+C0WW = C:\\WWitch\\lib\\c0wwjpn1.obj
+LIBS = C:\\WWitch\\lib\\libww.lib C:\\WWitch\\lsic86ww\\lib\\s\\runtime.lib
+
+COPTS = -1 -j1 -d -O -Z -ms! -zPCGROUP -zSDGROUP -zGDGROUP
+CFLAGS = -DWW
+
+all: wonbe.fx wonbe32.exe
+
+wonbe.fx: wonbe.bin
+	mkfent wonbe.cf
+
+wonbe.bin: wonbe.obj
+	tlink /m /c $(C0WW) wonbe.obj, wonbe, wonbe, $(LIBS)
+	exe2fbin wonbe.exe wonbe.bin
+	rm wonbe.exe
+
+wonbe.obj: wonbe.c keywords.h
+	tcc -I$(INCLUDE) $(COPTS) $(CFLAGS) -c wonbe.c
+
+wonbe32.exe: wonbe.o win32text.o
+	gcc -o wonbe32.exe wonbe.o win32text.o -lgdi32
+
+wonbe.o: wonbe.c keywords.h
+	gcc -c -DWIN32 -DCYGWIN wonbe.c
+
+win32text.o: win32text.c win32text.h
+

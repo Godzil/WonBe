@@ -1,8 +1,11 @@
 // wonbe Win32 text emulation
-// First Created: Nov.4,2000 by Nashiko
-// Copyright 2000 (c) by Pie Dey Co.,Ltd.
+/* First Created: Nov.4,2000 by Pie Dey Co.,Ltd. */
+
+/* This source code is distributed under GNU General Public License (GPL) */
+/* see http://www.gnu.org/ about GPL */
 
 #include <windows.h>
+#include <stdio.h>
 #include "win32text.h"
 
 #define SCREEN_SIZE_X (224/8)
@@ -280,6 +283,106 @@ unsigned int win32_get_tick_count()
 void win32_sys_wait( unsigned int val )
 {
 	Sleep( val*10 );
+}
+
+
+static BOOL bPlayingMIDI = FALSE;
+static UINT wDeviceID;
+
+DWORD stopMIDIFile(HWND hwnd)
+{
+	if( bPlayingMIDI ) {
+		mciSendCommand(MCI_ALL_DEVICE_ID, MCI_CLOSE, MCI_WAIT, (DWORD)NULL);
+    	bPlayingMIDI = FALSE;
+	}
+	return 0;
+}
+
+DWORD playMIDIFile(HWND hWndNotify, LPSTR lpszMIDIFileName)
+{
+    DWORD dwReturn;
+	MCI_OPEN_PARMS mciOpenParms;
+    MCI_PLAY_PARMS mciPlayParms;
+    MCI_STATUS_PARMS mciStatusParms;
+	//MCI_SEQ_SET_PARMS mciSeqSetParms;
+
+    // Open the device by specifying the device and filename.
+    // MCI will attempt to choose the MIDI mapper as the output port.
+    mciOpenParms.lpstrDeviceType = "sequencer";
+    mciOpenParms.lpstrElementName = lpszMIDIFileName;
+    if (dwReturn = mciSendCommand((MCIDEVICEID)NULL, MCI_OPEN,
+        MCI_OPEN_TYPE | MCI_OPEN_ELEMENT,
+        (DWORD)(LPVOID) &mciOpenParms))
+    {
+        // Failed to open device. Don't close it; just return error.
+        return (dwReturn);
+    }
+
+    // The device opened successfully; get the device ID.
+    wDeviceID = mciOpenParms.wDeviceID;
+
+	bPlayingMIDI = TRUE;
+
+    // Check if the output port is the MIDI mapper.
+    mciStatusParms.dwItem = MCI_SEQ_STATUS_PORT;
+    if (dwReturn = mciSendCommand(wDeviceID, MCI_STATUS, 
+        MCI_STATUS_ITEM, (DWORD)(LPVOID) &mciStatusParms))
+    {
+        mciSendCommand(wDeviceID, MCI_CLOSE, 0, (DWORD)NULL);
+        return (dwReturn);
+    }
+
+    // The output port is not the MIDI mapper. 
+    // Ask if the user wants to continue.
+    if (LOWORD(mciStatusParms.dwReturn) != MIDI_MAPPER)
+    {
+		//printf("Warning: The MIDI mapper is not available.\n");
+    }
+
+    // Begin playback. The window procedure function for the parent 
+    // window will be notified with an MM_MCINOTIFY message when 
+    // playback is complete. At this time, the window procedure closes 
+    // the device.
+    mciPlayParms.dwCallback = (DWORD) hWndNotify;
+    if (dwReturn = mciSendCommand(wDeviceID, MCI_PLAY, MCI_NOTIFY, 
+        (DWORD)(LPVOID) &mciPlayParms))
+    {
+        mciSendCommand(wDeviceID, MCI_CLOSE, 0, (DWORD)NULL);
+        return (dwReturn);
+    }
+
+    return (0L);
+}
+
+// "テキスト音楽「サクラ」"に含まれるdsakura.dllを用いてMMLを再生します
+// サクラは以下より入手できます http://www.text2music.com/
+// dsakura.dllが無ければ音が出ないだけで、エラーにはなりません。
+void win32_play_mml( const char * mml )
+{
+	static BOOL initialized = FALSE;
+	static HMODULE hmod = NULL;
+	static FARPROC pMMLtoMIDI = NULL;
+	if( !initialized ) {
+		HMODULE hmod = LoadLibrary("dsakura");
+		if( hmod != NULL ) {
+			pMMLtoMIDI = GetProcAddress( hmod, "MMLtoMIDI" );
+		} else {
+			printf("LoadLibrary(\"dsakura\") failed\n");
+		}
+		initialized = TRUE;
+	}
+	if( pMMLtoMIDI != NULL ) {
+		char errmsg[256];
+		BOOL b;
+		stopMIDIFile(hwnd);
+		b = (*pMMLtoMIDI)(mml,"$$$.mid",errmsg);
+		if( b == FALSE ) {
+			printf("dsakura: %s\n",errmsg);
+		}
+		playMIDIFile(hwnd, "$$$.mid");
+	} else {
+		printf("play: %s\n", mml );
+	}
 }
 
 // end of win32text.c

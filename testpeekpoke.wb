@@ -1,0 +1,11 @@
+100 a=varptr(A)
+110 s=varseg(A)
+120 debug "変数Aはオフセット";a;",セグメント";s
+130 A=0x1234
+140 defseg=s
+150 if peek(a) <> 0x34 then debug "peekが異常です(!)":end
+160 if peek(a+1) <> 0x12 then  debug "peekが異常です(2)":end
+170 poke a,0xfe
+180 poke a+1,0xdc
+190 if A <> 0xdcfe then debug "pokeが異常です":end
+900 debug "テスト完了"

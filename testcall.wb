@@ -1,0 +1,20 @@
+100 ' test machine language call
+110 A=varptr(@(0))
+115 gosub 1000
+120 ax=1:bx=2:cx=3:dx=4:si=-1:di=-2
+130 call A
+140 if ax <> 2 then debug "axの値が期待と違います":end
+150 if bx <> 3 then debug "bxの値が期待と違います":end
+160 if cx <> 4 then debug "cxの値が期待と違います":end
+170 if dx <> 5 then debug "dxの値が期待と違います":end
+180 if si <> 0 then debug "siの値が期待と違います":end
+190 if di <> -1 then debug "diの値が期待と違います":end
+900 debug "正常終了":end
+1000 poke A+0,0x40 'inc	ax
+1010 poke A+1,0x43 'inc	bx
+1020 poke A+2,0x41 'inc	cx
+1030 poke A+3,0x42 'inc	dx
+1040 poke A+4,0x46 'inc	si
+1050 poke A+5,0x47 'inc	di
+1060 poke A+6,0xCB 'ret (FAR)
+1090 return

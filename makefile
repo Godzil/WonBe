@@ -7,7 +7,7 @@ LINKER=..\..\vc15\bin\link
 CC=..\..\vc15\bin\cl
 ASM=..\..\vc15\bin\masm
 
-CFLAGS=/ASw /O /Gs /DWW
+CFLAGS=/ASw /O /Gs /DWW /DVC15
 AFLAGS=-Mx -DDISPLAY_MODE_JAPANESE1
 LFLAGS=/NOD /NOI /MAP
 

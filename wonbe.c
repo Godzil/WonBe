@@ -1,8 +1,14 @@
 /* wonbe: WonderWitch Basic Environment */
-/* First Created: Nov.3,2000 by Nashiko */
-/* Copyright 2000 (c) by Pie Dey Co.,Ltd. */
+/* First Created: Nov.3,2000 by Pie Dey Co.,Ltd. */
 
-/* This source code is for both VC++6.0 and Turbo C 2.0 */
+/* This source code is distributed under GNU General Public License (GPL) */
+/* see http://www.gnu.org/ about GPL */
+
+/* This source code is for: */
+/*   Visual C++ 1.5 (for WW binary) */
+/*   Visual C++ 6.0 (for Win32 binary) */
+/*   Turbo  C++ 1.0 (for WW binary,    by Hirotaka JOE Ohkubo) */
+/*   GNU Win32 gcc  (for Win32 binary, by Hirotaka JOE Ohkubo) */
 
 #include <stdio.h>
 #include <string.h>
@@ -22,7 +28,18 @@
 #include "win32text.h"
 #endif
 
-char myVersion[] = "0.04";
+/* cygwin でなぜか stdarg.h が読み込まれてない & __GNUC__ が効かない... */
+#ifdef CYGWIN
+#include <stdarg.h>
+#endif
+
+char myVersion[] = "0.05";
+
+#ifdef WW
+#define NEWLINE "\xa\xd"
+#else
+#define NEWLINE "\n"
+#endif
 
 #ifdef WW
 #define MEMMOVE mymemmove
@@ -37,6 +54,7 @@ typedef unsigned char BYTE;
 #endif
 typedef unsigned short WORD;
 typedef signed short SHORT;
+typedef unsigned long DWORD;
 
 #define EOL (0x0d)
 
@@ -50,6 +68,14 @@ typedef void (*NEARPROC)();
 
 #define WORKAREA_SIZE ((WORD)49152)
 #define LINE_SIZE (256)
+
+/* PLAY statement support */
+#ifdef WW
+#include <il_sound.h>
+SoundIL soundIL;
+extern BYTE *_heap;
+BOOL soundAvailable;
+#endif
 
 /* 実行のみのモードで動いているとき (シリアル経由で端末が居ないとき) */
 BOOL runtimeOnly;
@@ -141,11 +167,13 @@ typedef struct {
 KEYWORDITEM keywordsA[] = {
 	{ KEYWORD_AND,"and" },
 	{ KEYWORD_ABS,"abs" },
+	{ KEYWORD_AX,"ax"},
 	{ 0,NULL }
 };
 
 KEYWORDITEM keywordsB[] = {
 	{ KEYWORD_BREAK,"break" },
+	{ KEYWORD_BX, "bx" },
 	{ 0,NULL }
 };
 
@@ -153,17 +181,26 @@ KEYWORDITEM keywordsC[] = {
 	{ KEYWORD_CHR,"chr" },
 	{ KEYWORD_CLS,"cls" },
 	{ KEYWORD_CONT,"cont" },
+	{ KEYWORD_CALL, "call" },
+	{ KEYWORD_CSEG, "cseg" },
+	{ KEYWORD_CX,"cx" },
 	{ 0,NULL }
 };
 
 KEYWORDITEM keywordsD[] = {
 	{ KEYWORD_DEBUG,"debug" },
+	{ KEYWORD_DSEG, "dseg" },
+	{ KEYWORD_DX, "dx" },
+	{ KEYWORD_DI, "di" },
+	{ KEYWORD_DS, "ds" },
+	{ KEYWORD_DEFSEG, "defseg" },
 	{ 0,NULL }
 };
 
 KEYWORDITEM keywordsE[] = {
 	{ KEYWORD_END,"end" },
 	{ KEYWORD_EXIT,"exit" },
+	{ KEYWORD_ES, "es" },
 	{ 0,NULL }
 };
 
@@ -181,6 +218,7 @@ KEYWORDITEM keywordsG[] = {
 
 KEYWORDITEM keywordsI[] = {
 	{ KEYWORD_IF,"if" },
+	{ KEYWORD_INT, "int" },
 	{ 0,NULL }
 };
 
@@ -209,6 +247,9 @@ KEYWORDITEM keywordsO[] = {
 
 KEYWORDITEM keywordsP[] = {
 	{ KEYWORD_PRINT,"print" },
+	{ KEYWORD_PLAY,"play" },
+	{ KEYWORD_PEEK, "peek" },
+	{ KEYWORD_POKE, "poke" },
 	{ 0,NULL }
 };
 
@@ -235,12 +276,23 @@ KEYWORDITEM keywordsS[] = {
 	{ KEYWORD_SCAN_Y4,"scan_y4" },
 	{ KEYWORD_SCAN,"scan" },	/* scanはscna_Xより後になければならない */
 	{ KEYWORD_SAVE,"save" },
+	{ KEYWORD_SSEG, "sseg" },
+	{ KEYWORD_SI, "si" },
 	{ 0,NULL }
 };
+
 KEYWORDITEM keywordsT[] = {
 	{ KEYWORD_THEN,"then" },
 	{ KEYWORD_TO,"to" },
 	{ KEYWORD_TICK,"tick" },
+	{ KEYWORD_TRON,"tron" },
+	{ KEYWORD_TROFF,"troff" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsV[] = {
+	{ KEYWORD_VARPTR, "varptr" },
+	{ KEYWORD_VARSEG, "varseg" },
 	{ 0,NULL }
 };
 
@@ -261,13 +313,13 @@ KEYWORDITEM * keywordsIndex[26] = {
 	keywordsI, NULL,      NULL,      keywordsL, 
 	keywordsM, keywordsN, keywordsO, keywordsP, 
 	NULL,      keywordsR, keywordsS, keywordsT, 
-	NULL,      NULL,      keywordsW, keywordsX, 
+	NULL,      keywordsV, keywordsW, keywordsX, 
 	NULL,      NULL
 };
 
 /* インタラクティブモード時の1行バッファ */
 BYTE waRawLine[LINE_SIZE];
-BYTE waCoockedLine[LINE_SIZE];
+BYTE waCookedLine[LINE_SIZE];
 
 /* コードとデータを収める領域 */
 WORD codeTop;
@@ -338,87 +390,140 @@ WORD runLineNumber;
 // REQUEST_RUN_FILE or REQUEST_LOAD_FILE経由で処理するときだけTRUEとなる
 BOOL appendMode = FALSE;
 
+// Read/Writeされる擬似変数の置き場所
+WORD defseg;
+WORD registers[KEYWORD_ES-KEYWORD_AX+1];
+
+// トレースモード(tron/troff)
+BOOL traceFlag = FALSE;
+
+// マシン語アクセス関連
+#ifdef VC15
+// VC++1.5のときに使うコード
+WORD getdseg()
+{
+	WORD s;
+	__asm mov s, ds;
+	return s;
+}
+WORD getsseg()
+{
+	WORD s;
+	__asm mov s, ss;
+	return s;
+}
+WORD getcseg()
+{
+	WORD s;
+	__asm mov s, cs;
+	return s;
+}
+#else
+WORD getdseg()
+{
+	return 0;	// DUMMY VALUE
+}
+WORD getsseg()
+{
+	return 0;	// DUMMY VALUE
+}
+WORD getcseg()
+{
+	return 0;	// DUMMY VALUE
+}
+#endif
+
 /* エラー発生 */
 void syntaxError()
 {
-	commonPrint(NULL, "Syntax Error in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Syntax Error in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void divideByZero()
 {
-	commonPrint(NULL, "Divide by 0 in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Divide by 0 in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void outOfArraySubscription()
 {
-	commonPrint(NULL, "Out of Array Subscription in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Out of Array Subscription in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void lineNumberNotFound( WORD lineNumber )
 {
-	commonPrint(NULL, "Line Number %d not Found in %d\x07\n", lineNumber, currentLineNumber );
+	commonPrint(NULL, "Line Number %d not Found in %d\x7" NEWLINE, lineNumber, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void stackOverflow()
 {
-	commonPrint(NULL, "Stack Overflow in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Stack Overflow in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void stackUnderflow()
 {
-	commonPrint(NULL, "Stack Underflow in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Stack Underflow in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void nextWithoutFor()
 {
-	commonPrint(NULL, "Next without For in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Next without For in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void outOfMemory()
 {
-	commonPrint(NULL, "Out of memory in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Out of memory in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void loadError()
 {
-	commonPrint(NULL, "File Not Found or Load Error in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "File Not Found or Load Error in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void cantContinue()
 {
-	commonPrint(NULL, "Can't Continue in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Can't Continue in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void saveError()
 {
-	commonPrint(NULL, "Save Erroor in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Save Erroor in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void paramError()
 {
-	commonPrint(NULL, "Parameter Erroor in %d\x07\n", currentLineNumber );
+	commonPrint(NULL, "Parameter Erroor in %d\x7" NEWLINE, currentLineNumber );
+	bForceToReturnSuper = TRUE;
+	requestNextAction = REQUEST_INTERACTIVE;
+}
+
+void lineNumberZeroError()
+{
+	// このエラーはエディタが出すものなのでランタイムで発生することはあり得ない
+	// なので現在行番号を報告する意味がない
+	//commonPrint(NULL, "Invalid Line Number 0 in %d\x7" NEWLINE, currentLineNumber );
+	commonPrint(NULL, "Invalid Line Number 0\x7" NEWLINE );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
@@ -460,10 +565,12 @@ BYTE * skipToEOL( BYTE * p )
 	}
 }
 
-BYTE * skipToNextLine( BYTE * p )
-{
-	return skipToEOL( p+4 );	// +4は行番号2バイト行長さ2バイト
-}
+// 短い関数をインライン展開しないコンパイラ向けの最適化としてマクロ化
+#define skipToNextLine(p) ( skipToEOL(p+4)+1 )
+//BYTE * skipToNextLine( BYTE * p )
+//{
+//	return skipToEOL( p+4 );	// +4は行番号2バイト行長さ2バイト
+//}
 
 #if 1
 #define mytolower(ch) ((ch >= 'A' && ch <= 'Z')? ch - 'A' + 'a' : ch)
@@ -485,12 +592,14 @@ void clearRuntimeInfo()
 {
 	memset( globalVariables, 0, sizeof(globalVariables) );
 	memset( topLevelVariables, 0, sizeof(topLevelVariables) );
-	memset( stacks, 0, sizeof(globalVariables) );
+	memset( stacks, 0, sizeof(stacks) );
+	memset( registers, 0, sizeof(registers) );
 	executionPointer = NULL;
 	resumePointer = NULL;
 	currentLineNumber = 0;
 	localVariables = topLevelVariables;
 	stackPointer = 0;
+	defseg = getdseg();
 	srand(0);
 }
 
@@ -499,6 +608,9 @@ void processLineHeader()
 {
 	if( !bInteractive ) {
 		currentLineNumber = *((WORD *)executionPointer);
+		if( traceFlag ) {
+			commonPrint( NULL, "[%d]", currentLineNumber );
+		}
 		executionPointer += 4;	// +4は行番号2バイト行長さ2バイト
 	} else {
 		currentLineNumber = 0;
@@ -753,7 +865,7 @@ BOOL sourceDump( FILE FAR * fp, WORD from, WORD to )
 				p++;
 			}
 		}
-		b = commonPrint(fp,"\n");
+		b = commonPrint(fp,NEWLINE);
 		if( b == FALSE ) return FALSE;
 	}
 	return TRUE;
@@ -808,6 +920,9 @@ SHORT calcValue()
 		pvar = getArrayReference();
 		if( pvar == NULL ) return -1;
 		return *pvar;
+	}
+	if( ch >= KEYWORD_AX && ch <= KEYWORD_ES ) {
+		return registers[ch-KEYWORD_AX];
 	}
 	switch( ch ) {
 	case 0x01:	/*		次にあるのは10進2バイト整数 */
@@ -887,6 +1002,81 @@ SHORT calcValue()
 		return 1024;
 	case KEYWORD_SCAN_Y4:
 		return 2048;
+	case KEYWORD_DEFSEG:
+		return defseg;
+	case KEYWORD_DSEG:
+		return getdseg();
+	case KEYWORD_CSEG:
+		return getcseg();
+	case KEYWORD_SSEG:
+		return getsseg();
+	case KEYWORD_VARPTR:
+	case KEYWORD_VARSEG:
+		{
+			BOOL requestSeg;
+			SHORT * refer;
+			requestSeg = (ch == KEYWORD_VARSEG);
+			while( TRUE ) {
+				ch = *executionPointer++;
+				if( ch != ' ' && ch != '\t' ) break;
+			}
+			if( ch != '(' ) {
+				syntaxError();
+				return -1;
+			}
+			while( TRUE ) {
+				ch = *executionPointer++;
+				if( ch != ' ' && ch != '\t' ) break;
+			}
+			if( ch == '@' ) {	/* is it l-value? */
+				SHORT * pvar;
+				pvar = getArrayReference();
+				if( pvar == NULL ) return -1;
+				refer = pvar;
+			} else if( ch >= 'A' && ch <= 'Z' ) {
+				refer = &globalVariables[ch-'A'];
+			} else if( ch >= 'a' && ch <= 'z' ) {
+				refer = &localVariables[ch-'a'];
+			} else if( ch >= KEYWORD_AX && ch <= KEYWORD_ES ) {
+				refer = &registers[ch-KEYWORD_AX];
+			} else if( ch == KEYWORD_DEFSEG ) {
+				refer = &defseg;
+			} else {
+				syntaxError();
+				return -1;
+			}
+			while( TRUE ) {
+				ch = *executionPointer++;
+				if( ch != ' ' && ch != '\t' ) break;
+			}
+			if( ch != ')' ) {
+				syntaxError();
+				return -1;
+			}
+#ifdef WW
+			if( requestSeg ) {
+				return getdseg();
+			} else {
+				return (SHORT)refer;
+			}
+#else
+			printf("varseg/varptr: %08x\n", refer );
+			return 0;
+#endif
+		}
+	case KEYWORD_PEEK:
+		{
+			SHORT t;
+			BYTE FAR * fulladdr;
+			t = calcValue();
+			fulladdr = (BYTE FAR *)(((DWORD)defseg << 16) + (WORD)t);
+#ifdef WW
+			return *fulladdr;
+#else
+			printf("peek: %08x\n", fulladdr );
+			return 0;
+#endif
+		}
 	}
 	syntaxError();
 	return -1;
@@ -1065,27 +1255,6 @@ void st_assignment( SHORT * pvar )	/* 代入ステートメントだけ例外的に処理する */
 	*pvar = val;
 }
 
-void st_if()
-{
-	SHORT val;
-	BYTE ch;
-	val = expr();
-	if( bForceToReturnSuper ) return;
-	while( TRUE ) {
-		ch = *executionPointer++;
-		if( ch != ' ' && ch != '\t' ) break;
-	}
-	if( ch != KEYWORD_THEN ) {
-		syntaxError();
-		return;
-	}
-	if( val != 0 ) {
-		return;	/* thenの次から継続実行する */
-	}
-	/* 条件不成立につき、行末まで読み飛ばす */
-	executionPointer = skipToEOL( executionPointer );
-}
-
 void printOrDebug( BOOL bPrint )
 {
 	WORD lastChar;
@@ -1170,7 +1339,7 @@ void printOrDebug( BOOL bPrint )
 		if( bPrint ) {
 			ptextNewline();
 		} else {
-			commonPrint( NULL, "\r\n" );
+			commonPrint( NULL, NEWLINE );
 		}
 	}
 }
@@ -1261,10 +1430,41 @@ void st_return()
 		if( stacks[stackPointer].type == STACK_TYPE_GOSUB ) break;
 	}
 	executionPointer = stacks[stackPointer].returnPointer;
-	if( executionPointer >= waCoockedLine && executionPointer < waCoockedLine+LINE_SIZE ) {
+	if( executionPointer >= waCookedLine && executionPointer < waCookedLine+LINE_SIZE ) {
 		bInteractive = TRUE;
 	}
 	localVariables = stacks[stackPointer].lastLocalVariables;
+}
+
+void st_if()
+{
+	SHORT val;
+	BYTE ch;
+	val = expr();
+	if( bForceToReturnSuper ) return;
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != KEYWORD_THEN ) {
+		syntaxError();
+		return;
+	}
+	if( val != 0 ) {
+		while( TRUE ) {
+			ch = *executionPointer;
+			if( ch != ' ' && ch != '\t' ) break;
+			executionPointer++;
+		}
+		if( ch == 0x01 ) {
+			// thenのあとに整数が直接書かれた場合は、それにgotoする。
+			st_goto();
+			return;
+		}
+		return;	/* thenの次から継続実行する */
+	}
+	/* 条件不成立につき、行末まで読み飛ばす */
+	executionPointer = skipToEOL( executionPointer );
 }
 
 void st_for()
@@ -1376,7 +1576,7 @@ void st_end()
 /* breakステートメント:　デバッグ用の中断 */
 void st_break()
 {
-	commonPrint(NULL, "Break in %d\x07\n", currentLineNumber);
+	commonPrint(NULL, "Break in %d\x7" NEWLINE, currentLineNumber);
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 	resumePointer = executionPointer;	/* contする場所はbreakの次。breakのみの例外処理 */
@@ -1568,7 +1768,7 @@ void st_waitvb()
 void st_files()
 {
 #ifdef WIN32
-	commonPrint( NULL, "files statement not implemented in Win32\x07\n" );
+	commonPrint( NULL, "files statement not implemented in Win32\x7" NEWLINE );
 #endif
 #ifdef WW
 	int i;
@@ -1599,13 +1799,166 @@ void st_files()
 					waRawLine[p++] = statbuf.info[q++];
 				}
 				waRawLine[p++] = '\0';
-				commonPrint( NULL, "%s,%ld,%d\n", waRawLine, statbuf.len, statbuf.count );
+				commonPrint( NULL, "%s,%ld,%d" NEWLINE, waRawLine, statbuf.len, statbuf.count );
 			}
 		} else {
-			commonPrint( NULL, "*File Access Error\x07\n" );
+			commonPrint( NULL, "*File Access Error\x7" NEWLINE );
 		}
 	}
 #endif
+}
+
+void st_play()
+{
+	BYTE ch;
+
+	ch = *executionPointer++;
+	while ( ch == ' ' || ch == '\t' ) {
+		ch = *executionPointer++;
+	}
+	if ( ch != 0x03 ) {
+		syntaxError();
+		return;
+	}
+ 
+#ifdef WIN32
+	win32_play_mml( executionPointer );
+#endif
+#ifdef WW
+	if ( soundAvailable ) {
+		parse_mml( _heap, executionPointer, 0 );
+		bgm_play( _heap, PLAY_SINGLE );
+	}
+#endif
+
+	executionPointer += strlen(executionPointer)+1;
+}
+
+void st_poke()
+{
+	SHORT addr, data;
+	BYTE ch;
+	BYTE FAR * fulladdr;
+	addr = expr();
+	if( bForceToReturnSuper ) return;
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != ',' ) {
+		syntaxError();
+		return;
+	}
+	data = expr();
+	if( bForceToReturnSuper ) return;
+	fulladdr = (BYTE FAR *)(((DWORD)defseg << 16) + (WORD)addr);
+#ifdef WW
+	*fulladdr = data;
+#else
+	printf("poke: %08x %02x\n", fulladdr, data );
+#endif
+}
+
+void st_call()
+{
+	SHORT addr;
+	BYTE FAR * fulladdr;
+	addr = expr();
+	if( bForceToReturnSuper ) return;
+	fulladdr = (BYTE FAR *)(((DWORD)defseg << 16) + (WORD)addr);
+#ifdef WW
+#ifdef VC15
+// VC++1.5のときに使うコード
+	__asm {
+		push si
+		push di
+		push bp
+		mov ax,registers[(KEYWORD_AX-KEYWORD_AX)*2]
+		mov bx,registers[(KEYWORD_BX-KEYWORD_AX)*2]
+		mov cx,registers[(KEYWORD_CX-KEYWORD_AX)*2]
+		mov dx,registers[(KEYWORD_DX-KEYWORD_AX)*2]
+		mov si,registers[(KEYWORD_SI-KEYWORD_AX)*2]
+		mov di,registers[(KEYWORD_DI-KEYWORD_AX)*2]
+		mov es,registers[(KEYWORD_ES-KEYWORD_AX)*2]
+		push ds
+		mov ds,registers[(KEYWORD_DS-KEYWORD_AX)*2]
+		call far ptr ss:[fulladdr]
+		pop ds
+		mov registers[(KEYWORD_AX-KEYWORD_AX)*2],ax
+		mov registers[(KEYWORD_BX-KEYWORD_AX)*2],bx
+		mov registers[(KEYWORD_CX-KEYWORD_AX)*2],cx
+		mov registers[(KEYWORD_DX-KEYWORD_AX)*2],dx
+		mov registers[(KEYWORD_SI-KEYWORD_AX)*2],si
+		mov registers[(KEYWORD_DI-KEYWORD_AX)*2],di
+		mov registers[(KEYWORD_ES-KEYWORD_AX)*2],es
+		pop bp
+		pop di
+		pop si
+	}
+#else
+	// VC++ 1.5以外の処理系のためのコードは作っていません。欲しい人、自作しましょう
+#endif
+#else
+	printf("call: %08x\n", fulladdr );
+#endif
+}
+
+void st_int()
+{
+	SHORT number;
+	number = expr();
+	if( bForceToReturnSuper ) return;
+#ifdef WW
+#ifdef VC15
+// VC++1.5のときに使うコード
+	{
+		static BYTE specialIntCallCode[3] = { 0xcd, 0x00, 0xcb };
+		DWORD specialPtr;
+		specialIntCallCode[1] = (BYTE)number;
+		specialPtr = (((DWORD)getdseg() << 16) + (WORD)specialIntCallCode);
+		__asm {
+			push si
+			push di
+			push bp
+			mov ax,registers[(KEYWORD_AX-KEYWORD_AX)*2]
+			mov bx,registers[(KEYWORD_BX-KEYWORD_AX)*2]
+			mov cx,registers[(KEYWORD_CX-KEYWORD_AX)*2]
+			mov dx,registers[(KEYWORD_DX-KEYWORD_AX)*2]
+			mov si,registers[(KEYWORD_SI-KEYWORD_AX)*2]
+			mov di,registers[(KEYWORD_DI-KEYWORD_AX)*2]
+			mov es,registers[(KEYWORD_ES-KEYWORD_AX)*2]
+			push ds
+			mov ds,registers[(KEYWORD_DS-KEYWORD_AX)*2]
+			call far ptr ss:[specialPtr]
+			pop ds
+			mov registers[(KEYWORD_AX-KEYWORD_AX)*2],ax
+			mov registers[(KEYWORD_BX-KEYWORD_AX)*2],bx
+			mov registers[(KEYWORD_CX-KEYWORD_AX)*2],cx
+			mov registers[(KEYWORD_DX-KEYWORD_AX)*2],dx
+			mov registers[(KEYWORD_SI-KEYWORD_AX)*2],si
+			mov registers[(KEYWORD_DI-KEYWORD_AX)*2],di
+			mov registers[(KEYWORD_ES-KEYWORD_AX)*2],es
+			pop bp
+			pop di
+			pop si
+		}
+	}
+#else
+	// VC++ 1.5以外の処理系のためのコードは作っていません。欲しい人、自作しましょう
+#endif
+#else
+	printf("int: %04x\n", number );
+#endif
+}
+
+void st_tron()
+{
+	traceFlag = TRUE;
+}
+
+void st_troff()
+{
+	traceFlag = FALSE;
 }
 
 /* 行エディタ */
@@ -1620,10 +1973,17 @@ void editLine()
 	// 一方、中間言語翻訳の結果は先頭に0x01で始まる10進整数が行番号として入っている
 	// このギャップを転送時に解消しなければならない
 
-	// ここに来ているということは、waCoockedLine[0]が0x01つまり10進整数である //
-	assert( waCoockedLine[0] == 0x01 );
-	wishLineNumber = *((WORD*)&waCoockedLine[1]);
-	p = waCoockedLine+3;
+	// ここに来ているということは、waCookedLine[0]が0x01つまり10進整数である //
+	assert( waCookedLine[0] == 0x01 );
+	wishLineNumber = *((WORD*)&waCookedLine[1]);
+
+	/* 行番号 0 はだめ */
+	if ( wishLineNumber == 0 ) {
+		lineNumberZeroError();
+		return;
+	}
+
+	p = waCookedLine+3;
 	//target = getLineReferenceFromLineNumber( wishLineNumber );
 	target = getInsertionPointFromLineNumber( wishLineNumber );
 	lineNumber = *((WORD*)target);
@@ -1633,7 +1993,6 @@ void editLine()
 		if( ch != ' ' && ch != '\t' ) break;
 	}
 	if( ch == EOL ) {
-		WORD delta;
 		BYTE * from;
 		/* removing the line */
 		if( lineNumber == 0 || lineNumber != wishLineNumber ) {
@@ -1641,12 +2000,11 @@ void editLine()
 			return;
 		}
 		from = skipToNextLine(target);
-		delta = from-target;
 		MEMMOVE( target, from, (WORD)(dataTop-(from-wa)) );
-		dataTop -= delta;
+		dataTop -= from-target;
 	} else {
 		WORD len;	// プログラム領域上に収めるときのサイズ
-		len = skipToEOL(p)-waCoockedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
+		len = skipToEOL(p)-waCookedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
 		if( lineNumber == 0 || lineNumber != wishLineNumber ) {
 			/* insert new line */
 			if( dataTop + len >= WORKAREA_SIZE ) {
@@ -1660,7 +2018,7 @@ void editLine()
 			WORD lost;
 			BYTE * nextline;
 			int delta;
-			nextline = skipToNextLine(target)+1;
+			nextline = skipToNextLine(target);
 			lost = nextline-target;
 			delta = len-lost;
 			if( dataTop + delta >= WORKAREA_SIZE ) {
@@ -1671,11 +2029,11 @@ void editLine()
 			dataTop += delta;
 		}
 		// まず行番号をコピーする
-		*((WORD*)target) = *((WORD*)&waCoockedLine[1]);
+		*((WORD*)target) = *((WORD*)&waCookedLine[1]);
 		// 行の長さを収める
 		*((WORD*)(target+2)) = len;
 		// 残りをコピーする
-		MEMMOVE( target+4, waCoockedLine+3, (WORD)(len-4) );
+		MEMMOVE( target+4, waCookedLine+3, (WORD)(len-4) );
 	}
 }
 
@@ -1684,18 +2042,18 @@ void appendLine()
 {
 	BYTE * target;
 	WORD len;	// プログラム領域上に収めるときのサイズ
-	len = skipToEOL(waCoockedLine+3)-waCoockedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
+	len = skipToEOL(waCookedLine+3)-waCookedLine-1+2+1; //-1は0x01の分。+2は長さ情報。+1はEOL
 	if( dataTop + len >= WORKAREA_SIZE ) {
 		outOfMemory();
 		return;
 	}
 	target = &wa[dataTop-5];	// -5 is len of last-line-marker
 	// まず行番号をコピーする
-	*((WORD*)target) = *((WORD*)&waCoockedLine[1]);
+	*((WORD*)target) = *((WORD*)&waCookedLine[1]);
 	// 行の長さを収める
 	*((WORD*)(target+2)) = len;
 	// 残りをコピーする
-	MEMMOVE( target+4, waCoockedLine+3, (WORD)(len-4) );
+	MEMMOVE( target+4, waCookedLine+3, (WORD)(len-4) );
 	dataTop += len;
 	wa[dataTop-5] = 0;
 	wa[dataTop-4] = 0;
@@ -1705,10 +2063,10 @@ void appendLine()
 }
 
 /* 中間言語に翻訳する */
-BOOL convertInternalCode( BYTE * waCoockedLine, const BYTE * waRawLine )
+BOOL convertInternalCode( BYTE * waCookedLine, const BYTE * waRawLine )
 {
 	const BYTE * src = waRawLine;
-	BYTE * dst = waCoockedLine;
+	BYTE * dst = waCookedLine;
 	while( TRUE ) {
 		if( *src == '\0' ) break;
 		if( *src == '\n' ) break;
@@ -1879,7 +2237,13 @@ NEARPROC statements[KEYWORDS_STATEMENT_TO-KEYWORDS_STATEMENT_FROM+1] = {
 	st_exit,
 	st_debug,
 	st_waitvb,
-	st_files
+	st_files,
+	st_play,
+	st_poke,
+	st_call,
+	st_int,
+	st_tron,
+	st_troff
 };
 
 void interpreterMain()
@@ -1926,8 +2290,14 @@ void interpreterMain()
 				st_assignment( &globalVariables[ch-'A'] );
 			} else if( ch >= 'a' && ch <= 'z' ) {
 				st_assignment( &localVariables[ch-'a'] );
+			} else if( ch >= KEYWORD_AX && ch <= KEYWORD_ES ) {
+				st_assignment( &registers[ch-KEYWORD_AX] );
+			} else if( ch == KEYWORD_DEFSEG ) {
+				st_assignment( &defseg );
 			} else if( ch >= KEYWORDS_STATEMENT_FROM && ch <= KEYWORDS_STATEMENT_TO ) {
 				(*(statements[ch-KEYWORDS_STATEMENT_FROM]))();
+			} else if( ch == '?' ) {
+				st_debug();
 			} else {
 				syntaxError();
 			}
@@ -1940,30 +2310,36 @@ void interpreterMain()
 void interactiveMain( FILE FAR * fp )
 {
 	if( fp == NULL ) {
-		commonPrint(NULL,"OK\n");
+		commonPrint(NULL,"OK" NEWLINE);
 	}
 	while( TRUE ) {
 		BOOL b;
+		WORD l;
 		if( fp == NULL ) {
 			consoleInput( waRawLine, LINE_SIZE );
 		} else {
 			char FAR * r;
 			r = fgets( waRawLine, LINE_SIZE, fp );
 			if( r == NULL ) break;
+			/* ファイル中に LF があると残ってしまうのを消す */
+			l = strlen(waRawLine)-1;
+			if ( waRawLine[l] == '\x0a' ){
+				waRawLine[l] = '\0';
+			}
 		}
 #ifdef WW
 		if( fp == NULL ) {
-			commonPrint( NULL, "\r\n" );
+			commonPrint( NULL, NEWLINE );
 		}
 #endif
 		/* 中間言語に翻訳する */
-		b = convertInternalCode( waCoockedLine, waRawLine );
+		b = convertInternalCode( waCookedLine, waRawLine );
 		if( b == FALSE ) {
 			bForceToReturnSuper = FALSE;
 			continue;
 		}
 		/* 数値で開始されているか? */
-		if( waCoockedLine[0] == 0x01 ) {
+		if( waCookedLine[0] == 0x01 ) {
 			/* 行エディタを呼び出す */
 			if( appendMode ) {
 				appendLine();
@@ -1975,7 +2351,7 @@ void interactiveMain( FILE FAR * fp )
 			}
 		} else {
 			/* その行を実行する */
-			executionPointer = waCoockedLine;
+			executionPointer = waCookedLine;
 			interpreterMain();
 		}
 		if( bForceToReturnSuper ) return;
@@ -2004,6 +2380,7 @@ void do_new()
 {
 	clearRuntimeInfo();
 	bInteractive = TRUE;
+	traceFlag = FALSE;
 	codeTop = 0;
 	wa[0] = 0;
 	wa[1] = 0;
@@ -2172,6 +2549,12 @@ int main( int argc, char *argv[] )
 	createText();
 #endif
 #ifdef WW
+#ifdef CURRENT_DIR_IS_RAM0
+	// シンボルCURRENT_DIR_IS_RAM0を定義してビルドすると
+	// カレントディレクトリは/ram0で走る
+	// 定義しなければ/rom0で走る
+	chdir("/ram0");
+#endif
 	text_screen_init();
 	b = entranceUI();
 	if( b == FALSE ) return 0;
@@ -2179,20 +2562,35 @@ int main( int argc, char *argv[] )
 		comm_set_baudrate(1);
 		comm_open();
 	}
+
+	/* PLAY statement support */
+	soundAvailable = FALSE;
+	if (open_sound_il(&soundIL) == E_FS_SUCCESS) {
+		soundAvailable = TRUE;
+		//  sounddrv_init();  いらないならわざわざ呼ばない。
+		sound_open();
+	}
 #endif
+
 	ptextCLS();
 	if( requestNextAction == REQUEST_NO_ACTION ) {
 		do_new();
 	}
 	if( !runtimeOnly ) {
-		commonPrint(NULL,"ワンべぇ WonderWitch Tiny BASIC Environment Ver %s\n",myVersion);
-		commonPrint(NULL,"Copyright 2000 (c) by Pie Dey Co.,Ltd.\n");
+		commonPrint(NULL,"ワンべぇ WonderWitch Tiny BASIC Environment Ver %s" NEWLINE,myVersion);
+		commonPrint(NULL,"Authors: Pie Dey Co.,Ltd., Hirotaka JOE Ohkubo" NEWLINE);
+		commonPrint(NULL,"This program is distributed under GNU General Public License" NEWLINE);
 	}
 	superMain();
 #ifdef WIN32
 	deleteText();
 #endif
 #ifdef WW
+	/* PLAY statement support */
+	if (soundAvailable) {
+		sound_close();
+		sounddrv_release();
+	}
 	if( !runtimeOnly ) {
 		comm_close();
 	}

@@ -1,0 +1,26 @@
+100 cx=22
+110 ds=varseg(@(0))
+120 dx=varptr(@(0))
+125 ax=10*256
+130 int 0x17
+140 if ax<>0 then debug "BIOS‚ªƒGƒ‰[‚ğ•Ô‚µ‚Ü‚µ‚½":end
+150 debug "name dump:";
+160 for i=0 to 15:debug peek(varptr(@(0))+i);",";:next:debug
+162 debug "name char:";
+165 for i=0 to 15:debug chr(peek(varptr(@(0))+i));:next:debug
+170 debug
+180 debug "birth_year:";@(8)
+190 debug "birth_month:";peek(varptr(@(0))+18)
+200 debug "birth_day:";peek(varptr(@(0))+19)
+210 debug "sex:";
+220 s = peek(varptr(@(0))+20)
+230 if s=0 then debug "?"
+240 if s=1 then debug "male"
+250 if s=2 then debug "female"
+260 debug "bloodtype:";
+270 b = peek(varptr(@(0))+21)
+280 if b=0 then debug "?"
+290 if b=1 then debug "A"
+300 if b=2 then debug "B"
+310 if b=3 then debug "O"
+320 if b=4 then debug "AB"
