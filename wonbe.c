@@ -18,7 +18,7 @@
 #include "win32text.h"
 #endif
 
-char myVersion[] = "0.02";
+char myVersion[] = "0.03";
 
 #ifdef WW
 #define MEMMOVE mymemmove
@@ -795,7 +795,7 @@ SHORT calcValue()
 	return -1;
 }
 
-SHORT expr()
+SHORT expr4th()
 {
 	SHORT acc;
 	acc = calcValue();
@@ -808,12 +808,6 @@ SHORT expr()
 			if( ch != ' ' && ch != '\t' ) break;
 		}
 		switch( ch ) {
-		case '+':
-			acc = acc + calcValue();
-			break;
-		case '-':
-			acc = acc - calcValue();
-			break;
 		case '*':
 			acc = acc * calcValue();
 			break;
@@ -828,15 +822,54 @@ SHORT expr()
 				}
 			}
 			break;
-		case KEYWORD_AND:
-			acc = acc & calcValue();
+		default:
+			executionPointer--;		/* unget it */
+			return acc;
+		}
+		if( bForceToReturnSuper ) return -1;
+	}
+}
+
+SHORT expr3nd()
+{
+	SHORT acc;
+	acc = expr4th();
+	if( bForceToReturnSuper ) return -1;
+
+	while( TRUE ) {
+		BYTE ch;
+		while( TRUE ) {
+			ch = *executionPointer++;
+			if( ch != ' ' && ch != '\t' ) break;
+		}
+		switch( ch ) {
+		case '+':
+			acc = acc + expr4th();
 			break;
-		case KEYWORD_OR:
-			acc = acc | calcValue();
+		case '-':
+			acc = acc - expr4th();
 			break;
-		case KEYWORD_XOR:
-			acc = acc ^ calcValue();
-			break;
+		default:
+			executionPointer--;		/* unget it */
+			return acc;
+		}
+		if( bForceToReturnSuper ) return -1;
+	}
+}
+
+SHORT expr2nd()
+{
+	SHORT acc;
+	acc = expr3nd();
+	if( bForceToReturnSuper ) return -1;
+
+	while( TRUE ) {
+		BYTE ch;
+		while( TRUE ) {
+			ch = *executionPointer++;
+			if( ch != ' ' && ch != '\t' ) break;
+		}
+		switch( ch ) {
 		case '>':
 			{
 				BYTE ch2;
@@ -845,10 +878,12 @@ SHORT expr()
 					if( ch2 != ' ' && ch2 != '\t' ) break;
 				}
 				if( ch2 == '=' ) {
-					acc = (acc >= calcValue());
+					acc = (acc >= expr3nd());
+					if( acc != 0 ) acc = -1;
 				} else {
 					executionPointer--;
-					acc = (acc > calcValue());
+					acc = (acc > expr3nd());
+					if( acc != 0 ) acc = -1;
 				}
 			}
 			break;
@@ -860,17 +895,51 @@ SHORT expr()
 					if( ch2 != ' ' && ch2 != '\t' ) break;
 				}
 				if( ch2 == '=' ) {
-					acc = (acc <= calcValue());
+					acc = (acc <= expr3nd());
+					if( acc != 0 ) acc = -1;
 				} else if( ch2 == '>' ) {
-					acc = (acc != calcValue());
+					acc = (acc != expr3nd());
+					if( acc != 0 ) acc = -1;
 				} else {
 					executionPointer--;
-					acc = (acc < calcValue());
+					acc = (acc < expr3nd());
+					if( acc != 0 ) acc = -1;
 				}
 			}
 			break;
 		case '=':
-			acc = (acc == calcValue());
+			acc = (acc == expr3nd());
+			if( acc != 0 ) acc = -1;
+			break;
+		default:
+			executionPointer--;		/* unget it */
+			return acc;
+		}
+		if( bForceToReturnSuper ) return -1;
+	}
+}
+
+SHORT expr()
+{
+	SHORT acc;
+	acc = expr2nd();
+	if( bForceToReturnSuper ) return -1;
+
+	while( TRUE ) {
+		BYTE ch;
+		while( TRUE ) {
+			ch = *executionPointer++;
+			if( ch != ' ' && ch != '\t' ) break;
+		}
+		switch( ch ) {
+		case KEYWORD_AND:
+			acc = acc & expr2nd();
+			break;
+		case KEYWORD_OR:
+			acc = acc | expr2nd();
+			break;
+		case KEYWORD_XOR:
+			acc = acc ^ expr2nd();
 			break;
 		default:
 			executionPointer--;		/* unget it */
@@ -982,7 +1051,7 @@ void printOrDebug( BOOL bPrint )
 			break;
 		default:
 			{
-				WORD val;
+				SHORT val;
 #ifdef WW
 				static
 #endif
@@ -1183,6 +1252,20 @@ void st_next()
 	}
 	/* count step and loop again */
 	*(stacks[stackPointer-1].pvar) += stacks[stackPointer-1].step;
+	/* counter overflow? */
+	if( stacks[stackPointer-1].step > 0 ) {
+		if( stacks[stackPointer-1].limit < *(stacks[stackPointer-1].pvar) ) {
+			/* loop done */
+			stackPointer--;
+			return;
+		}
+	} else {
+		if( stacks[stackPointer-1].limit > *(stacks[stackPointer-1].pvar) ) {
+			/* loop done */
+			stackPointer--;
+			return;
+		}
+	}
 	executionPointer = stacks[stackPointer-1].returnPointer;
 }
 
@@ -1456,7 +1539,7 @@ void editLine()
 		delta = from-target;
 		MEMMOVE( target, from, (WORD)(dataTop-(from-wa)) );
 		dataTop -= delta;
-		clearRuntimeInfo();
+		/*clearRuntimeInfo();*/
 	} else {
 		WORD len;
 		len = skipToEOL(waCoockedLine+2)-waCoockedLine+1;
@@ -1472,7 +1555,7 @@ void editLine()
 			MEMMOVE( target+len, target, (WORD)(dataTop-(target-wa)) );
 			MEMMOVE( target, waCoockedLine, len );
 			dataTop += len;
-			clearRuntimeInfo();
+			/*clearRuntimeInfo();*/
 		} else {
 			/* replace line */
 			WORD lost;
@@ -1488,7 +1571,7 @@ void editLine()
 			MEMMOVE( nextline+delta, nextline, (WORD)(dataTop-(nextline-wa)) );
 			MEMMOVE( target, waCoockedLine, len );
 			dataTop += delta;
-			clearRuntimeInfo();
+			/*clearRuntimeInfo();*/
 		}
 	}
 }
@@ -1540,14 +1623,36 @@ BOOL convertInternalCode( BYTE * waCoockedLine, const BYTE * waRawLine )
 					acc *= 10;
 					acc += *src - '0';
 					src++;
-				}
-				if( acc < 0 ) {	/* overflow case */
-					syntaxError();
-					return FALSE;
+					if( acc < 0 ) {	/* overflow case */
+						syntaxError();
+						return FALSE;
+					}
 				}
 				*((SHORT*)dst) = acc;
 				dst += 2;
 			}
+#if 0
+/* 以下のコードは、2項演算子の-を負数と解釈することがあるので使えない */
+		} else if( *src == '-' && (*(src+1) >= '0' && *(src+1) <= '9' ) ) {
+			WORD acc;
+			/* 負数の10進のとき */
+			*dst++ = 0x01;
+			src++;
+			acc = *src-'0';
+			src++;
+			while( TRUE ) {
+				if( *src < '0' || *src > '9' ) break;
+				acc *= 10;
+				acc += *src - '0';
+				src++;
+				if( acc > 32768 ) {	/* overflow case */
+					syntaxError();
+					return FALSE;
+				}
+			}
+			*((SHORT*)dst) = -((SHORT)acc);
+			dst += 2;
+#endif
 		} else if( (*src >= 'a' && *src <= 'z') || (*src >= 'A' && *src <= 'Z') ) {
 			BYTE next = *(src+1);
 			if( (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ) {
@@ -1701,7 +1806,7 @@ void interpreterMain()
 void interactiveMain( FILE FAR * fp )
 {
 	if( fp == NULL ) {
-		commonPrint(NULL,"*Ready\n");
+		commonPrint(NULL,"OK\n");
 	}
 	while( TRUE ) {
 		BOOL b;
@@ -1737,6 +1842,9 @@ void interactiveMain( FILE FAR * fp )
 		if( waCoockedLine[0] == 0x01 ) {
 			/* 行エディタを呼び出す */
 			editLine();
+			if( fp == NULL ) {
+				clearRuntimeInfo();
+			}
 		} else {
 			/* その行を実行する */
 			executionPointer = waCoockedLine;
@@ -1785,6 +1893,7 @@ BOOL do_merge( const BYTE * filename )
 	}
 	interactiveMain( fp );
 	fclose( fp );
+	clearRuntimeInfo();
 	if( bForceToReturnSuper ) return FALSE;
 	return TRUE;
 }

@@ -1,0 +1,95 @@
+100 rem じゃんけんゲーム for ワンべぇ
+110 rem     Nov.6,2000 by autumn
+200 T=40 'waitvbする長さ
+900 randomize tick
+1000 cls
+1010 print "　■　　■　　　　　　　　　　　　　　■"
+1020 print "　■　■　■　　　　　　　　　　　　　■"
+1030 print "　■　　■　　　　　　　　　　　　　　■"
+1040 print "　■　　■■　　　■　■■　　　　　■"
+1050 print "　■　　　　　　　■　■　　　　　　■"
+1060 print "　■　　　　　　　■　■■■　　　　■"
+1070 print "　■　　　　　　　■■　　　■　　■　■　　■"
+1080 print "　■　　　　　　■■　　　　■　　■■■　　　■"
+1090 print "　■　　　　　　■■　　　　■　　■　■　　　■"
+1100 print "　■　　　　■　　　■　■■　　■　　■　　　■"
+1110 print "　■　　　　■　　　■■■　　　■　　　■　■■"
+1120 print "　■　　　■■　　　■　　　　　■　　　■　■"
+1130 print "　■■■■■　　　　■　　　　■　　　　■■■"
+1140 print "　　　■■　　　　　　■　　　　　　　　■"
+1200 waitvb T
+2000 cls
+2010 print "　　　　　　　■　　　　　　　　■"
+2020 print "　　■　　　　■　　　　　　　　■"
+2030 print "　　■　　　　■　　　　　　　■"
+2040 print "　■■　　　　■　　　　　　　■"
+2050 print "　■　　■■■■■■■　　　　■"
+2060 print "　■　　■■■■　　　　　　■"
+2070 print "　■　　　　　■　　　　　　■■■　　　■"
+2080 print "　■　　　　　■　　　　　■■■■　　　　■"
+2090 print "　■　　　　　■　　　　　■　　■　　　　■"
+2100 print "　■　　　　　■　　　　　■　　■■　　■"
+2110 print "　■　　　　　■　　　　■　　　　■　　■"
+2120 print "　　■　　　　■　　　　■　　　　■　■■"
+2130 print "　■　　　　■■　　　　■　　　　■■■"
+2140 print "　　　　　　■　　　　　　　　　　　■"
+2200 waitvb T
+3000 a=rnd(3)
+3010 goto 4000+(a*1000)
+4000 cls
+4010 print "　　　　　　　　　　　　　　■"
+4020 print "　　　　　　■　■　　　　　■■■■■■"
+4030 print "　　　　　■■　　■　　　　　　■■■■"
+4040 print "　　　　■■　■　　■"
+4050 print "　　　■■　　　■"
+4060 print "　　　■　　　　　■　　　　　■■■■■"
+4070 print "　　■　　　　　　　　　　■■■■■■■"
+4080 print "　■■　　　　　　　　　　■　　　　　■■"
+4090 print "　■■　　　　　　　　　　　　　　　　■■"
+4100 print "　　■■　　　　　　　　　　　　　　　■■"
+4110 print "　　　■■　　　　　　　　　　　　　　■■"
+4120 print "　　　　■　　　　　　　　　　　　　　■"
+4130 print "　　　　■■　　　　　　　　　　　　■■"
+4140 print "　　　　　■■　　　　　　　　　■■■"
+4150 print "　　　　　　■■　　　　　　　■■■"
+4160 print "　　　　　　　　　　　　　　　■"
+4200 goto 7000
+5000 cls
+5010 print "　　　　　　　　　　　　　　　　　■"
+5020 print "　　■　　　　　　　　　　　　　　■"
+5030 print "　■　　　　　　　　　　　　　　　■　　■"
+5040 print "　■　■■　　　　　　　　　　■■■■■■"
+5050 print "■■■■■　　　　　■　　　　■■　■"
+5060 print "　■　　　　　　　　■　　　　　　　■　■■"
+5070 print "　■　　　　　　　　■　　　　■■■■■■"
+5080 print "　■　　　　　　　　■■■　　■■　　■"
+5090 print "　■■■■■　　　　■　　　　　　　　■"
+5100 print "　■■　　■　　　　■　　　　　■■■■■"
+5110 print "■■　　　　■　　　■　　　　■■　　　■"
+5120 print "■　　　　　■　■■■■　　　■"
+5130 print "　　　　　■　　■　■■■　　■"
+5140 print "　　　■■■　　■　■　　■　■■"
+5150 print "　　■■■　　　■■　　　　　　■■■■"
+5160 print "　　　　　　　　　　　　　　　　　■■■"
+5200 goto 7000
+6000 cls
+6010 print "　　　　　　　　　■■■　　　　■"
+6020 print "　■　　　　　■■■　■　　　　■"
+6030 print "　　■　　　　■　■　■　　　　■"
+6040 print "　　■　　　　　■　■　　■■■■■■■"
+6050 print "　　■　■■■■■■■　　■■■　　　　■"
+6060 print "　■■　■■■■■　　　　　　■　　■"
+6070 print "　■　　　　　　■　　　　　　■■■■■"
+6080 print "　■　　　　　　■　　　　　　■■■■■■"
+6090 print "　■　　　　　　■　　　　　■■　　■　　■"
+6100 print "　■　　　　　　■　　　　■■　■　■　　■"
+6110 print "　■　　　■■■■　　　　■　　■■　　　■"
+6120 print "　■　　■■　　■■　　　■　　■■　　　■"
+6130 print "　■　　■　　　■■■　　■　　■　　　　■"
+6140 print "　■■　　■■■　　■　　■　■■■　　■■"
+6150 print "　　　　　■■　　　　　　　■■　　■■■"
+6160 print "　　　　　　　　　　　　　　　　　　■"
+7000 locate 0,16:print "   **PUSH START TO EXIT**";
+7010 locate 0,17:print "**ANOTHER BUTTON TO AGAIN**";
+7100 d=wait
+7200 goto 1000
