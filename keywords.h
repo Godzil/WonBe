@@ -34,12 +34,15 @@
 #define	KEYWORD_INT			0x9b
 #define	KEYWORD_TRON		0x9c
 #define	KEYWORD_TROFF		0x9d
+#define KEYWORD_COLORMODE	0x9e
+#define KEYWORD_PALETTE		0x9f
+#define KEYWORD_COLOR		0xa0
 
-#define	KEYWORD_AND			0xa0
-#define	KEYWORD_OR			0xa1
-#define	KEYWORD_XOR			0xa2
+#define	KEYWORD_AND			0xb0
+#define	KEYWORD_OR			0xb1
+#define	KEYWORD_XOR			0xb2
 
-#define	KEYWORD_NOT			0xb0
+#define	KEYWORD_NOT			0xb8
 #define	KEYWORD_SCAN		0xc0
 #define	KEYWORD_WAIT		0xc1
 #define	KEYWORD_RND			0xc2
@@ -62,6 +65,7 @@
 #define	KEYWORD_SCAN_Y2		0xd7
 #define	KEYWORD_SCAN_Y3		0xd8
 #define	KEYWORD_SCAN_Y4		0xd9
+#define KEYWORD_HARDARCH	0xda
 
 #define	KEYWORD_AX			0xe0
 #define	KEYWORD_BX			0xe1
@@ -79,9 +83,9 @@
 #define	KEYWORD_STEP		0xf3
 
 #define KEYWORDS_STATEMENT_FROM 0x80
-#define KEYWORDS_STATEMENT_TO 0x9d
-#define KEYWORDS_2OP_FROM 0xa0
-#define KEYWORDS_2OP_TO 0xa2
+#define KEYWORDS_STATEMENT_TO 0xa0
+#define KEYWORDS_2OP_FROM 0xb0
+#define KEYWORDS_2OP_TO 0xb2
 
 /*
 WONBE 中間言語フォーマット
@@ -93,6 +97,7 @@ WONBE 中間言語フォーマット
 　1行の構造
 
 WORD 行番号 (1-32767)
+WORD 行の長さ
 任意の中間コードの列
 BYTE 0x0d 行末ターミネータ
 

@@ -1,7 +1,7 @@
 INCLUDE=C:\vshare\ww\dev\WWitch\include
 LIB=..\COMMON
 
-LIBS=libww.lib runtime.lib
+LIBS=libww.lib libwwc.lib runtime.lib
 
 LINKER=..\..\vc15\bin\link
 CC=..\..\vc15\bin\cl

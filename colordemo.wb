@@ -1,0 +1,11 @@
+100 rem draw random characters
+110 if hardarch = 0 then print "Try in WonerSwanColor":a=wait:end
+120 colormode 128
+200 for i=0 to 1000
+300 locate rnd(28), rnd(17):color rnd(4), rnd(4):print chr(rnd(256));
+400 next
+450 locate 0,0:color 3,0:print "Push START to exit...."
+500 rem palette random
+600 palette rnd(4), rnd(16), rnd(16), rnd(16)
+700 waitvb 30
+800 goto 500

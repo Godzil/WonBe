@@ -21,6 +21,7 @@
 #include <sys/process.h>
 #include <sys/fcntl.h>
 #include <sys/bios.h>
+#include <sys/libwwc.h>
 #define assert(x)
 #endif
 #include "keywords.h"
@@ -33,7 +34,7 @@
 #include <stdarg.h>
 #endif
 
-char myVersion[] = "0.05";
+char myVersion[] = "0.06";
 
 #ifdef WW
 #define NEWLINE "\xa\xd"
@@ -87,6 +88,13 @@ void fatalExit( const char * msg )
 	text_put_string( 0, 0, (char*)msg );
 	text_put_string( 0, 3, "PUSH ANY BUTTON" );
 	key_wait();
+}
+#endif
+
+#ifdef WW
+BOOL isWonderSwanColor()
+{
+	return wwc_get_hardarch() != HARDARCH_WS;
 }
 #endif
 
@@ -184,6 +192,8 @@ KEYWORDITEM keywordsC[] = {
 	{ KEYWORD_CALL, "call" },
 	{ KEYWORD_CSEG, "cseg" },
 	{ KEYWORD_CX,"cx" },
+	{ KEYWORD_COLORMODE,"colormode" },
+	{ KEYWORD_COLOR,"color" },
 	{ 0,NULL }
 };
 
@@ -213,6 +223,11 @@ KEYWORDITEM keywordsF[] = {
 KEYWORDITEM keywordsG[] = {
 	{ KEYWORD_GOTO,"goto" },
 	{ KEYWORD_GOSUB,"gosub" },
+	{ 0,NULL }
+};
+
+KEYWORDITEM keywordsH[] = {
+	{ KEYWORD_HARDARCH,"hardarch" },
 	{ 0,NULL }
 };
 
@@ -250,6 +265,7 @@ KEYWORDITEM keywordsP[] = {
 	{ KEYWORD_PLAY,"play" },
 	{ KEYWORD_PEEK, "peek" },
 	{ KEYWORD_POKE, "poke" },
+	{ KEYWORD_PALETTE, "palette" },
 	{ 0,NULL }
 };
 
@@ -309,7 +325,7 @@ KEYWORDITEM keywordsX[] = {
 
 KEYWORDITEM * keywordsIndex[26] = {
 	keywordsA, keywordsB, keywordsC, keywordsD, 
-	keywordsE, keywordsF, keywordsG, NULL, 
+	keywordsE, keywordsF, keywordsG, keywordsH, 
 	keywordsI, NULL,      NULL,      keywordsL, 
 	keywordsM, keywordsN, keywordsO, keywordsP, 
 	NULL,      keywordsR, keywordsS, keywordsT, 
@@ -506,14 +522,14 @@ void cantContinue()
 
 void saveError()
 {
-	commonPrint(NULL, "Save Erroor in %d\x7" NEWLINE, currentLineNumber );
+	commonPrint(NULL, "Save Error in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
 
 void paramError()
 {
-	commonPrint(NULL, "Parameter Erroor in %d\x7" NEWLINE, currentLineNumber );
+	commonPrint(NULL, "Parameter Error in %d\x7" NEWLINE, currentLineNumber );
 	bForceToReturnSuper = TRUE;
 	requestNextAction = REQUEST_INTERACTIVE;
 }
@@ -1002,6 +1018,12 @@ SHORT calcValue()
 		return 1024;
 	case KEYWORD_SCAN_Y4:
 		return 2048;
+	case KEYWORD_HARDARCH:
+#ifdef WW
+		return wwc_get_hardarch();
+#else
+		return 0;	/* DUMMY VALUE */
+#endif
 	case KEYWORD_DEFSEG:
 		return defseg;
 	case KEYWORD_DSEG:
@@ -1961,6 +1983,96 @@ void st_troff()
 	traceFlag = FALSE;
 }
 
+void st_colormode()
+{
+	SHORT newmode;
+	newmode = expr();
+	if( bForceToReturnSuper ) return;
+#ifdef WW
+	if( isWonderSwanColor() ) {
+		/*SHORT result;*/
+		/*result =*/ wwc_set_color_mode( newmode );
+		/*if( result != newmode ) {*/
+		/*	paramError();*/	/* 値の設定に失敗したとき */
+		/*	return;*/
+		/*}*/
+	}
+#else
+	printf("colormode: %d\n", newmode );
+#endif
+}
+
+void st_palette()
+{
+	SHORT index, r, g, b;
+	BYTE ch;
+	index = expr();
+	if( bForceToReturnSuper ) return;
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != ',' ) {
+		syntaxError();
+		return;
+	}
+	r = expr();
+	if( bForceToReturnSuper ) return;
+
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != ',' ) {
+		syntaxError();
+		return;
+	}
+	g = expr();
+	if( bForceToReturnSuper ) return;
+
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != ',' ) {
+		syntaxError();
+		return;
+	}
+	b = expr();
+	if( bForceToReturnSuper ) return;
+
+#ifdef WW
+	if( isWonderSwanColor() ) {
+		wwc_palette_set_color(0, index, ((r << 8)&0xf00) | ((g << 4)&0xf0) | (b&0xf)  );
+	}
+#else
+	printf("palette: %d (%d,%d,%d)\n", index, r, g, b );
+#endif
+}
+
+void st_color()
+{
+	SHORT fore, back;
+	BYTE ch;
+	fore = expr();
+	if( bForceToReturnSuper ) return;
+	while( TRUE ) {
+		ch = *executionPointer++;
+		if( ch != ' ' && ch != '\t' ) break;
+	}
+	if( ch != ',' ) {
+		syntaxError();
+		return;
+	}
+	back = expr();
+	if( bForceToReturnSuper ) return;
+#ifdef WW
+	font_set_color( (fore & 0x03) | ((back << 2) & 0x0c));
+#else
+	printf("color: %d %d\n", fore & 3, back & 3 );
+#endif
+}
+
 /* 行エディタ */
 void editLine()
 {
@@ -2243,7 +2355,10 @@ NEARPROC statements[KEYWORDS_STATEMENT_TO-KEYWORDS_STATEMENT_FROM+1] = {
 	st_call,
 	st_int,
 	st_tron,
-	st_troff
+	st_troff,
+	st_colormode,
+	st_palette,
+	st_color
 };
 
 void interpreterMain()
